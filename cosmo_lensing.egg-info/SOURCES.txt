@@ -1,3 +1,4 @@
+README.md
 setup.py
 cosmo_lensing/__init__.py
 cosmo_lensing/correlations.py
@@ -6,6 +7,7 @@ cosmo_lensing/derivatives.py
 cosmo_lensing/io.py
 cosmo_lensing/nfw.py
 cosmo_lensing/observables.py
+cosmo_lensing/synthetic_data.py
 cosmo_lensing.egg-info/PKG-INFO
 cosmo_lensing.egg-info/SOURCES.txt
 cosmo_lensing.egg-info/dependency_links.txt
@@ -15,3 +17,4 @@ tests/test_cosmology.py
 tests/test_derivatives.py
 tests/test_integration.py
 tests/test_observables.py
+tests/test_synthetic_data.py
