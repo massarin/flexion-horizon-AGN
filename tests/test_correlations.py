@@ -178,7 +178,7 @@ class TestTangentialCorrelation:
             rmax=20.0,
             nbins=6,
             sep_units='arcmin',
-            var_method='sample'
+            var_method='shot'  # Use shot noise for small sample
         )
         
         # Three lenses in a line
