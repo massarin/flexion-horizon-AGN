@@ -1,0 +1,262 @@
+"""
+Snakemake workflow for lensing analysis pipeline.
+
+This workflow automates the full lensing analysis:
+1. Compute lensing observables from deflection fields
+2. Compute tangential shear correlations around galaxies
+3. Fit NFW profiles (TODO: Phase 4)
+4. Generate publication plots (TODO: Phase 4)
+
+Usage:
+    # Dry run to show planned jobs
+    snakemake -n
+
+    # Run locally with 4 cores
+    snakemake --cores 4
+
+    # Run specific target
+    snakemake results/kappa_050.fits --cores 1
+
+    # Run on HPC with SLURM
+    snakemake --profile slurm --jobs 50
+
+Configuration:
+    Edit workflow/config.yaml to set:
+    - deflection_ids: List of field IDs to process
+    - observables: Which maps to compute
+    - correlation parameters: rmin, rmax, nbins, etc.
+"""
+
+import os
+from pathlib import Path
+
+# Load configuration
+configfile: "workflow/config.yaml"
+
+# Expand lists from config
+FIELD_IDS = config.get("deflection_ids", [50, 100, 150, 200, 250])
+OBSERVABLES = config.get("observables", ["kappa", "gamma1", "gamma2"])
+ALL_OBSERVABLES = ["kappa", "gamma1", "gamma2", "F1", "F2", "G1", "G2", "rotation"]
+
+# Directories
+DATADIR = Path(config.get("datadir", "Data"))
+OUTDIR = Path(config.get("outdir", "results"))
+CATALOG = Path(config.get("galaxy_catalog", "Data/Galaxies_0-6_lensed.v2.0_cut_i27.fits"))
+
+# Correlation parameters
+CORR_PARAMS = config.get("correlation", {
+    "rmin": 0.05,
+    "rmax": 5.0,
+    "nbins": 20,
+    "var_method": "jackknife",
+    "npatch": 50,
+    "sampling": 10
+})
+
+
+# ============================================================================
+# Rules
+# ============================================================================
+
+rule all:
+    """
+    Default target: compute all observables and correlations.
+    """
+    input:
+        # Observable maps
+        expand(
+            str(OUTDIR / "{observable}_{field_id:03d}.fits"),
+            observable=OBSERVABLES,
+            field_id=FIELD_IDS
+        ),
+        # Correlation functions
+        expand(
+            str(OUTDIR / "tangential_shear_{field_id:03d}.npz"),
+            field_id=FIELD_IDS
+        )
+
+
+rule compute_observables:
+    """
+    Compute lensing observables from deflection field.
+    
+    Reads binary deflection file, computes Jacobian, extracts convergence/shear/flexion,
+    writes FITS files.
+    """
+    input:
+        deflection = str(DATADIR / "deflection_{field_id}.bin")
+    output:
+        kappa = str(OUTDIR / "kappa_{field_id}.fits"),
+        gamma1 = str(OUTDIR / "gamma1_{field_id}.fits"),
+        gamma2 = str(OUTDIR / "gamma2_{field_id}.fits"),
+        # Optional: flexion maps
+        F1 = str(OUTDIR / "F1_{field_id}.fits") if "F1" in OBSERVABLES else [],
+        F2 = str(OUTDIR / "F2_{field_id}.fits") if "F2" in OBSERVABLES else [],
+        G1 = str(OUTDIR / "G1_{field_id}.fits") if "G1" in OBSERVABLES else [],
+        G2 = str(OUTDIR / "G2_{field_id}.fits") if "G2" in OBSERVABLES else []
+    params:
+        observables = " ".join(OBSERVABLES),
+        flexion_flag = "" if any(obs in OBSERVABLES for obs in ["F1", "F2", "G1", "G2"]) else "--no-flexion"
+    log:
+        str(OUTDIR / "logs" / "compute_observables_{field_id}.log")
+    threads: 1
+    resources:
+        mem_mb = 16000,  # 16 GB for large maps
+        runtime = 30     # minutes
+    shell:
+        """
+        python scripts/compute_observables.py {input.deflection} \
+            --outdir {OUTDIR} \
+            --observables {params.observables} \
+            {params.flexion_flag} \
+            --overwrite \
+            --verbose \
+            > {log} 2>&1
+        """
+
+
+rule compute_correlations:
+    """
+    Compute tangential shear correlation around galaxies.
+    
+    Reads shear maps and galaxy catalog, computes azimuthal averages,
+    writes correlation profiles with jackknife errors.
+    """
+    input:
+        gamma1 = str(OUTDIR / "gamma1_{field_id}.fits"),
+        gamma2 = str(OUTDIR / "gamma2_{field_id}.fits"),
+        kappa = str(OUTDIR / "kappa_{field_id}.fits"),
+        catalog = str(CATALOG)
+    output:
+        correlation = str(OUTDIR / "tangential_shear_{field_id}.npz")
+    params:
+        rmin = CORR_PARAMS["rmin"],
+        rmax = CORR_PARAMS["rmax"],
+        nbins = CORR_PARAMS["nbins"],
+        var_method = CORR_PARAMS["var_method"],
+        npatch = CORR_PARAMS["npatch"],
+        sampling = CORR_PARAMS["sampling"]
+    log:
+        str(OUTDIR / "logs" / "compute_correlations_{field_id}.log")
+    threads: 1
+    resources:
+        mem_mb = 8000,
+        runtime = 60
+    shell:
+        """
+        python scripts/compute_correlations.py \
+            --gamma1 {input.gamma1} \
+            --gamma2 {input.gamma2} \
+            --kappa {input.kappa} \
+            --catalog {input.catalog} \
+            --outdir {OUTDIR} \
+            --field-id {wildcards.field_id} \
+            --rmin {params.rmin} \
+            --rmax {params.rmax} \
+            --nbins {params.nbins} \
+            --var-method {params.var_method} \
+            --npatch {params.npatch} \
+            --sampling {params.sampling} \
+            --overwrite \
+            --verbose \
+            > {log} 2>&1
+        """
+
+
+rule fit_nfw:
+    """
+    Fit NFW profiles to tangential shear measurements.
+    
+    TODO: Implement in Phase 4
+    """
+    input:
+        correlation = str(OUTDIR / "tangential_shear_{field_id}.npz")
+    output:
+        params = str(OUTDIR / "nfw_params_{field_id}.csv")
+    log:
+        str(OUTDIR / "logs" / "fit_nfw_{field_id}.log")
+    shell:
+        """
+        echo "NFW fitting not yet implemented" > {log}
+        touch {output.params}
+        """
+
+
+rule generate_plots:
+    """
+    Generate publication-ready plots.
+    
+    TODO: Implement in Phase 4
+    """
+    input:
+        expand(
+            str(OUTDIR / "tangential_shear_{field_id:03d}.npz"),
+            field_id=FIELD_IDS
+        )
+    output:
+        plot = str(OUTDIR / "plots" / "tangential_shear_all.png")
+    log:
+        str(OUTDIR / "logs" / "generate_plots.log")
+    shell:
+        """
+        echo "Plotting not yet implemented" > {log}
+        mkdir -p {OUTDIR}/plots
+        touch {output.plot}
+        """
+
+
+rule clean:
+    """
+    Remove all generated files (be careful!).
+    """
+    shell:
+        """
+        rm -rf {OUTDIR}/*.fits {OUTDIR}/*.npz {OUTDIR}/logs
+        """
+
+
+# ============================================================================
+# Helper rules
+# ============================================================================
+
+rule check_inputs:
+    """
+    Verify that all required input files exist.
+    """
+    run:
+        import sys
+        missing = []
+        
+        # Check deflection files
+        for field_id in FIELD_IDS:
+            deflection_file = DATADIR / f"deflection_{field_id:03d}.bin"
+            if not deflection_file.exists():
+                missing.append(str(deflection_file))
+        
+        # Check catalog
+        if not CATALOG.exists():
+            missing.append(str(CATALOG))
+        
+        if missing:
+            print("ERROR: Missing input files:", file=sys.stderr)
+            for f in missing:
+                print(f"  - {f}", file=sys.stderr)
+            sys.exit(1)
+        else:
+            print("All input files found!")
+
+
+rule provenance:
+    """
+    Save provenance information (git commit, config, checksums).
+    """
+    output:
+        git_commit = str(OUTDIR / "provenance" / "git_commit.txt"),
+        config_snapshot = str(OUTDIR / "provenance" / "config.yaml")
+    shell:
+        """
+        mkdir -p {OUTDIR}/provenance
+        git rev-parse HEAD > {output.git_commit}
+        git diff --quiet || echo "WARNING: Uncommitted changes" >> {output.git_commit}
+        cp workflow/config.yaml {output.config_snapshot}
+        """

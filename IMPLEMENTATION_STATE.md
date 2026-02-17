@@ -1,6 +1,6 @@
 # Implementation State: Julia → Python Conversion
 
-**Status**: Phase 1 - Foundation (In Progress)  
+**Status**: Phase 4 - Production Pipeline (In Progress)  
 **Last Updated**: 2026-02-17  
 
 ---
@@ -16,44 +16,138 @@ This codebase performs **weak gravitational lensing analysis** on cosmological N
 5. **Fits** NFW halo profiles to infer masses and concentrations
 6. **Generates** publication plots for thesis
 
-**Current State (Julia)**: 22 files, ~2500 duplicate lines, no tests, monolithic 1734-line toolkit, hardcoded paths, silent failures
+**Original State (Julia)**: 22 files, ~2500 duplicate lines, no tests, monolithic 1734-line toolkit, hardcoded paths, silent failures
 
-**Target State (Python)**: 6 focused modules, comprehensive tests, production pipeline with Snakemake, HPC-ready, full reproducibility
+**Current State (Python)**: 
+- 6 focused modules implemented: io, cosmology, derivatives, observables, nfw, correlations
+- 101/101 tests passing (< 1 second runtime)
+- Full TreeCorr integration for spatial correlations
+- NFW profile with analytic lensing formulas
+- No external C dependencies (replaced libsoftlens.so with astropy)
 
 ---
 
-## Phase 1 Progress
+## Phase Completion Status
 
-### ✅ Completed Tasks
+### ✅ Phase 1: Foundation (Weeks 1-2) - COMPLETE
+**Goal**: Core computational modules with comprehensive testing
 
-**Package Structure**:
-- [x] Created `cosmo_lensing/` package with 6 modules
-- [x] Created `tests/` directory with pytest infrastructure
-- [x] Created `scripts/` and `workflow/` directories
-- [x] Added `setup.py` and `requirements.txt`
-
-**Core Modules Implemented**:
+**Completed**:
+- [x] Package structure: `cosmo_lensing/` with 6 modules
 - [x] `io.py`: Read/write deflection fields with error handling (268 lines)
-- [x] `cosmology.py`: CosmologyCalculator class wrapping astropy (218 lines)
-- [x] `derivatives.py`: Finite-difference derivatives and Jacobian (235 lines)
-- [x] `observables.py`: Convergence, shear, flexion calculations (311 lines)
-- [x] `correlations.py`: TangentialCorrelation stub (Phase 3)
-- [x] `nfw.py`: NFWProfile stub (Phase 3)
+- [x] `cosmology.py`: CosmologyCalculator wrapping astropy (218 lines) 
+- [x] `derivatives.py`: 4th-order finite differences (235 lines)
+- [x] `observables.py`: All lensing observables (311 lines)
+- [x] Testing: 53 tests in conftest.py, test_cosmology.py, test_derivatives.py, test_observables.py, test_integration.py
+- [x] Git commits: 4 commits with proper attribution
+- [x] Key achievement: Replaced libsoftlens.so C library with pure Python
 
-**Testing Infrastructure**:
-- [x] `conftest.py`: Pytest fixtures for synthetic data
-- [x] `test_cosmology.py`: 15 tests, all passing
-- [x] `test_derivatives.py`: 16 tests, all passing
-- [x] `test_observables.py`: 21 tests, all passing
-- [x] `test_integration.py`: End-to-end pipeline test, passing
-- [x] **Total: 53 unit tests, 100% passing**
+**Results**: 53/53 tests passing, < 1 second runtime
 
-**Key Features**:
-- [x] Explicit error handling with custom exceptions
-- [x] Type hints on all function signatures
-- [x] Comprehensive docstrings with paper citations
-- [x] Logging throughout
-- [x] Replaced libsoftlens.so with astropy (no external C dependencies)
+### ✅ Phase 2: Synthetic Data & Validation (Week 3) - COMPLETE
+**Goal**: Generate analytic test data for validation
+
+**Completed**:
+- [x] `synthetic_data.py`: 6 generator functions (360 lines)
+  * Point mass, SIS, simplified NFW deflection fields
+  * Pure shear and pure convergence fields
+  * Configurable grid sizes and parameters
+- [x] `test_synthetic_data.py`: 18 comprehensive tests (345 lines)
+  * Validation of analytic properties
+  * Finite-difference accuracy tests
+  * Tolerance adjustments for strong gradients
+- [x] Git commit documenting Phase 2 completion
+- [x] Test suite expansion: 71 total tests
+
+**Results**: 71/71 tests passing
+
+### ✅ Phase 3: Correlation Functions (Week 4) - COMPLETE
+**Goal**: TreeCorr integration and NFW profile implementation
+
+**Completed**:
+- [x] `nfw.py`: Full NFW profile (280 lines)
+  * _F_function(): Wright & Brainerd (2000) auxiliary function
+  * _g_function(): Mean convergence for shear
+  * convergence(): κ(r) profile
+  * shear_tangential(): γ_t(r) profile  
+  * excess_surface_density(): ΔΣ(r)
+- [x] `test_nfw.py`: 22 tests validating NFW (245 lines)
+- [x] `correlations.py`: Full TreeCorr wrapper (218 lines)
+  * TangentialCorrelation class with NGCorrelation
+  * compute(): Tangential shear with jackknife/bootstrap errors
+  * compute_flexion(): First and second flexion correlations
+  * Automatic npatch adjustment for small samples
+  * Fallback to shot noise for single-patch cases
+- [x] `test_correlations.py`: 8 tests (265 lines)
+- [x] Deleted obsolete Julia scripts: correlation_plots_sis_model*.jl
+- [x] Git commits: 2 commits (NFW + TreeCorr)
+
+**Results**: 101/101 tests passing, full TreeCorr integration validated
+
+### 🔄 Phase 4: Production Pipeline (Weeks 5-6) - IN PROGRESS
+**Goal**: Snakemake workflow for reproducible analysis
+
+**Tasks**:
+- [ ] Create `workflow/Snakefile` with rules:
+  * `rule compute_observables`: deflection.bin → kappa.fits, gamma.fits, ...
+  * `rule compute_correlations`: observables + catalog → tangential_shear.npz
+  * `rule fit_models`: tangential_shear.npz → nfw_params.csv  
+  * `rule generate_plots`: nfw_params.csv → correlation_plots.png
+  * `rule all`: aggregate all outputs
+- [ ] Create `workflow/config.yaml` with analysis parameters
+- [ ] Create production scripts in `scripts/`:
+  * `compute_observables.py`: CLI for observable maps
+  * `compute_correlations.py`: CLI for correlation functions
+  * `fit_nfw_profiles.py`: CLI for NFW fitting with covariance
+  * `generate_plots.py`: Publication-ready figures
+- [ ] Add provenance tracking (git hash, checksums, config)
+- [ ] Test workflow locally and on HPC
+
+**Expected Results**: Fully reproducible pipeline from raw data → thesis plots
+
+### ⏸️ Phase 5: HEALPix & Scaling (Week 7-8) - PENDING
+**Goal**: Handle full-sky data and optimize performance
+
+**Tasks**:
+- [ ] Implement `healpix_utils.py`:
+  * HEALPix → Cartesian projection for finite differences
+  * Neighbor finding for boundary conditions
+  * Memory-efficient chunking (process Nside=8192 in 100 MB chunks)
+- [ ] Add `ray_parallel.py` for distributed processing:
+  * Ray task graph for embarrassingly parallel operations
+  * Progress tracking with tqdm
+  * Automatic checkpointing
+- [ ] Performance optimization:
+  * Profile with `line_profiler`
+  * Vectorize hot loops (aim for 10× speedup)
+  * Consider numba JIT for derivatives
+- [ ] Scaling tests:
+  * 100×100 pixels: < 1 second
+  * 1000×1000 pixels: < 10 seconds  
+  * 20000×20000 pixels: < 5 minutes (target)
+
+### ⏸️ Phase 6: Final Validation & Cleanup (Week 9-10) - PENDING  
+**Goal**: Production-ready package
+
+**Tasks**:
+- [ ] End-to-end validation:
+  * Run full pipeline on one deflection field
+  * Compare results to original Julia code (< 1% difference)
+  * Validate all plots match thesis figures
+- [ ] Documentation:
+  * README with installation instructions
+  * Tutorial notebook (Jupyter)
+  * API reference (Sphinx autodoc)
+  * CITATION.bib file
+- [ ] Cleanup:
+  * Delete all Julia files after validation
+  * Remove unused imports
+  * Run black formatter
+  * Final test suite run
+- [ ] Package release:
+  * Tag v1.0.0
+  * Archive on Zenodo for DOI
+  * Update thesis with DOI reference
 
 ---
 

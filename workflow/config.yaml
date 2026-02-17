@@ -1,0 +1,64 @@
+# Configuration for lensing analysis pipeline
+# Edit this file to customize the analysis
+
+# Input data
+datadir: "Data"
+galaxy_catalog: "Data/Galaxies_0-6_lensed.v2.0_cut_i27.fits"
+
+# Output directory
+outdir: "results"
+
+# Deflection field IDs to process
+# These correspond to deflection_{id}.bin files
+deflection_ids:
+  - 50
+  - 100
+  - 150
+  - 200
+  - 250
+
+# Observables to compute
+# Available: kappa, gamma1, gamma2, F1, F2, G1, G2, rotation
+observables:
+  - kappa
+  - gamma1
+  - gamma2
+
+# Optional: Compute flexion (slower)
+compute_flexion: false
+
+# Correlation function parameters
+correlation:
+  rmin: 0.05          # Minimum separation [arcmin]
+  rmax: 5.0           # Maximum separation [arcmin]
+  nbins: 20           # Number of radial bins
+  bin_type: "Log"     # Binning type: "Log" or "Linear"
+  var_method: "jackknife"  # Error estimation: "jackknife", "bootstrap", or "shot"
+  npatch: 50          # Number of patches for jackknife/bootstrap
+  sampling: 10        # Pixel sampling factor (higher = faster, less accurate)
+
+# NFW fitting parameters (TODO: Phase 4)
+nfw_fit:
+  r_min_fit: 0.1      # Minimum radius for fit [arcmin]
+  r_max_fit: 2.0      # Maximum radius for fit [arcmin]
+  initial_ks: 0.5     # Initial guess for kappa_s
+  initial_rs: 100.0   # Initial guess for scale radius [arcsec]
+
+# Plotting options (TODO: Phase 4)
+plotting:
+  dpi: 300
+  figsize: [10, 8]
+  style: "publication"
+  show_individual: true
+  show_stacked: true
+
+# Performance tuning
+performance:
+  max_memory_gb: 16   # Maximum memory per job
+  chunk_size: 1000    # Chunk size for large arrays
+
+# HPC settings (for SLURM profile)
+hpc:
+  partition: "compute"
+  account: "your_account"
+  max_runtime_minutes: 120
