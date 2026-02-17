@@ -238,9 +238,8 @@ def main():
     start = time.time()
     
     try:
-        deflection, metadata = lensing_io.read_deflection_field(deflection_file)
-        redshift = metadata['redshift']
-        pixel_scale = args.pixel_scale if args.pixel_scale else metadata.get('pixel_scale', 1.0)
+        deflection, redshift = lensing_io.read_deflection_field(deflection_file)
+        pixel_scale = args.pixel_scale if args.pixel_scale else 1.0  # Default pixel scale
         
         elapsed = time.time() - start
         logger.info(f"Read deflection field in {elapsed:.2f}s")
