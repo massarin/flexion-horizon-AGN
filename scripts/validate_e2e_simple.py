@@ -105,7 +105,21 @@ for i, (key, cmap, title) in enumerate(plot_configs):
     if key in observables:
         # Downsample for faster plotting
         data = observables[key][::10, ::10]
-        im = axes[i].imshow(data, cmap=cmap, origin="lower")
+        
+        # Use percentile-based colorbar ranges for better contrast
+        finite_data = data[np.isfinite(data)]
+        if len(finite_data) > 0:
+            if cmap == "RdBu_r":
+                # Symmetric range for diverging colormaps
+                abs_max = np.percentile(np.abs(finite_data), 99)
+                vmin, vmax = -abs_max, abs_max
+            else:
+                # Asymmetric percentile range for sequential colormaps
+                vmin, vmax = np.percentile(finite_data, [1, 99])
+        else:
+            vmin, vmax = None, None
+        
+        im = axes[i].imshow(data, cmap=cmap, origin="lower", vmin=vmin, vmax=vmax)
         plt.colorbar(im, ax=axes[i], fraction=0.046)
         axes[i].set_title(title)
         axes[i].set_xlabel("X [pixels/10]")
@@ -115,7 +129,15 @@ for i, (key, cmap, title) in enumerate(plot_configs):
 if "gamma1" in observables and "gamma2" in observables:
     gamma_mag = np.sqrt(observables["gamma1"] ** 2 + observables["gamma2"] ** 2)
     data = gamma_mag[::10, ::10]
-    im = axes[5].imshow(data, cmap="viridis", origin="lower")
+    
+    # Percentile-based range for shear magnitude
+    finite_data = data[np.isfinite(data)]
+    if len(finite_data) > 0:
+        vmin, vmax = np.percentile(finite_data, [1, 99])
+    else:
+        vmin, vmax = None, None
+    
+    im = axes[5].imshow(data, cmap="viridis", origin="lower", vmin=vmin, vmax=vmax)
     plt.colorbar(im, ax=axes[5], fraction=0.046)
     axes[5].set_title("Shear Magnitude |γ|")
     axes[5].set_xlabel("X [pixels/10]")
