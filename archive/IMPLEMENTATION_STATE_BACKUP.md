@@ -1,29 +1,29 @@
-# Implementation State: Weak Lensing Pipeline
+# Implementation State: Julia → Python Conversion
 
-**Status**: Phase 7 - GGL Analysis & Tutorial (PLANNING COMPLETE → Ready for Implementation)  
-**Last Updated**: 2026-02-18  
-**Test Status**: 126/126 passing → Target: 175/175 passing
+**Status**: Phase 4 - Production Pipeline (In Progress)  
+**Last Updated**: 2026-02-17  
 
 ---
 
 ## Summary
 
-This codebase is a **weak gravitational lensing analysis pipeline** for cosmological simulations (HAGN/Horizon-AGN). It computes lensing observables (convergence κ, shear γ, flexion F/G) from deflection fields and performs galaxy-galaxy lensing (GGL) correlation analysis with NFW/SIS profile fitting.
+This codebase performs **weak gravitational lensing analysis** on cosmological N-body simulations (HAGN/Horizon-AGN). The pipeline:
 
-**Current Goal**: Reproduce Laurent's thesis results - GGL correlations for κ, γ, F, G with NFW and SIS profile fits across 5 redshift slices (z=0.21→3.91).
+1. **Reads** deflection fields (α₁, α₂) from Fortran binary files (20k×20k pixels per redshift slice)
+2. **Computes** Jacobian matrix ∂αᵢ/∂xⱼ and second derivatives via finite differences
+3. **Extracts** lensing observables: convergence (κ), shear (γ₁, γ₂), flexion (F₁, F₂, G₁, G₂)
+4. **Measures** tangential correlations around galaxies (galaxy-galaxy lensing)
+5. **Fits** NFW halo profiles to infer masses and concentrations
+6. **Generates** publication plots for thesis
 
-**Pipeline**:
-1. Read deflection fields or pre-computed lensing maps (FITS)
-2. Compute Jacobian matrix and observables (κ, γ₁, γ₂, ω, F, G)
-3. Load galaxy catalogs with selection cuts (mass, redshift, central/satellite)
-4. Compute tangential correlations around lens galaxies (GGL stacking)
-5. Fit NFW and SIS profiles to extract halo properties
-6. Generate publication-quality plots
+**Original State (Julia)**: 22 files, ~2500 duplicate lines, no tests, monolithic 1734-line toolkit, hardcoded paths, silent failures
 
-**Progress**:
-- ✅ Phases 1-6 complete (foundation, core modules, HEALPix, E2E validation)
-- ✅ 126 tests passing, 3.7s runtime, production-ready
-- 🔄 Phase 7: GGL workflow + tutorial (THIS PHASE)
+**Current State (Python)**: 
+- 6 focused modules implemented: io, cosmology, derivatives, observables, nfw, correlations
+- 101/101 tests passing (< 1 second runtime)
+- Full TreeCorr integration for spatial correlations
+- NFW profile with analytic lensing formulas
+- No external C dependencies (replaced libsoftlens.so with astropy)
 
 ---
 
@@ -161,275 +161,7 @@ This codebase is a **weak gravitational lensing analysis pipeline** for cosmolog
 
 ---
 
-## 🎯 Phase 7: GGL Analysis & Tutorial
-
-**Objective**: Reproduce thesis GGL results with interactive tutorial
-
-### Issues and Proposed Solutions
-
-#### **Issue #1: Missing GGL Analysis Pipeline** [Priority: HIGH]
-**Problem**: No end-to-end workflow for galaxy-galaxy lensing  
-**Solution**: Create `cosmo_lensing/ggl.py` module (300 LOC)
-
-**Tasks**:
-- [ ] Create `GGLAnalysis` class with lens selection, stacking, fitting
-- [ ] Integrate with existing `correlations.py` and new `profiles.py`
-- [ ] Unit tests (15): selection, binning, stacking logic
-- [ ] Integration tests (5): synthetic halos → recover parameters
-- [ ] Validation test (1, slow): HAGN subset smoke test
-
-**Effort**: 6 hours | **Status**: Pending
-
----
-
-#### **Issue #2: Visualization Colorbar Ranges** [Priority: MEDIUM]
-**Problem**: `scripts/validate_e2e_simple.py:108-122` uses full range → poor contrast  
-**Solution**: Percentile-based clipping (1-99%)
-
-**Tasks**:
-- [ ] Update line 108: `vmin, vmax = np.percentile(data[np.isfinite(data)], [1, 99])`
-- [ ] Symmetric ranges for diverging colormaps (RdBu_r)
-- [ ] Regenerate validation plots with correct colorbars
-
-**Effort**: 0.5 hours | **Status**: Pending
-
----
-
-#### **Issue #3: Missing SIS Profile Model** [Priority: HIGH]
-**Problem**: Only NFW exists, thesis uses both NFW and SIS  
-**Solution**: Refactor to `profiles.py` with base class + SIS
-
-**Tasks**:
-- [ ] Create `cosmo_lensing/profiles.py` with `LensingProfile` base class
-- [ ] Move `NFWProfile` from `nfw.py` → `profiles.py`
-- [ ] Implement `SISProfile` with convergence, shear, fitting
-- [ ] Update all imports: `from cosmo_lensing.profiles import NFWProfile, SISProfile`
-- [ ] Tests (10): SIS physics, fitting, edge cases
-
-**Effort**: 4 hours | **Status**: Pending
-
----
-
-#### **Issue #4: No Interactive Tutorial** [Priority: HIGH]
-**Problem**: No Jupyter notebook showcasing workflow  
-**Solution**: Create comprehensive `docs/tutorial.ipynb`
-
-**Tasks**:
-- [ ] Section 1: Load HAGN map + catalog (5 cells)
-- [ ] Section 2: Visualize observables with correct colorbars (6 cells)
-- [ ] Section 3: Select lens galaxies (mass/z cuts) (4 cells)
-- [ ] Section 4: Compute GGL correlations (κ, γ, F, G) (5 cells)
-- [ ] Section 5: Fit NFW profile (4 cells)
-- [ ] Section 6: Fit SIS profile + comparison (3 cells)
-- [ ] Section 7: Reproduce thesis multi-panel plot (3 cells)
-- [ ] Add %%time cells for performance documentation
-
-**Effort**: 4 hours | **Status**: Pending
-
----
-
-#### **Issue #5: Unimplemented NFW Fitting** [Priority: HIGH]
-**Problem**: `nfw.py:259` raises `NotImplementedError`  
-**Solution**: Implement with `scipy.optimize.curve_fit`
-
-**Tasks**:
-- [ ] Implement `fit_nfw_profile(r, xi, xi_err)` → (best_fit, fit_info)
-- [ ] Return covariance, chi², reduced chi², errors
-- [ ] Tests (5): synthetic data, noise, bad initial guess, edge cases
-
-**Effort**: 2 hours | **Status**: Pending
-
----
-
-#### **Issue #6: DRY Violation - Duplicate Loaders** [Priority: MEDIUM]
-**Problem**: Loading functions duplicated in 3 scripts  
-**Solution**: Consolidate in `cosmo_lensing/io.py`
-
-**Tasks**:
-- [ ] Add `load_lensing_map(filename)` to `io.py`
-- [ ] Add `load_galaxy_catalog(filename, filters)` to `io.py`
-- [ ] Update scripts to import from `io`
-- [ ] Tests (5): valid files, filtering, errors
-
-**Effort**: 1 hour | **Status**: Pending
-
----
-
-#### **Issue #7: Missing Input Validation** [Priority: MEDIUM]
-**Problem**: `correlations.py:75-108` lacks input validation  
-**Solution**: Add comprehensive checks
-
-**Tasks**:
-- [ ] Validate array lengths match
-- [ ] Check for NaN/Inf values
-- [ ] Check coordinate ranges (-90 ≤ dec ≤ 90, 0 ≤ ra ≤ 360)
-- [ ] Check reasonable shear magnitudes (|γ| < 10 sanity check)
-- [ ] Tests (8): mismatched lengths, NaN, bounds, valid input
-
-**Effort**: 1 hour | **Status**: Pending
-
----
-
-#### **Issue #8: Include Convergence in GGL** [Priority: MEDIUM]
-**Problem**: Convergence κ computation clarified  
-**Solution**: Include κ in GGL workflow
-
-**Tasks**:
-- [x] Verified Julia code computes κ from Jacobian (`raytrace_tk.jl:1680`)
-- [ ] Ensure `observables.convergence()` integrated in GGL
-- [ ] Include κ correlations in tutorial
-- [ ] Document limitation: κ requires Jacobian (not just final observables)
-
-**Effort**: 0.5 hours | **Status**: Research complete, implementation pending
-
----
-
-#### **Issue #9: Test Strategy for GGL** [Priority: HIGH]
-**Problem**: New GGL module needs comprehensive testing  
-**Solution**: Multi-level test pyramid
-
-**Tasks**:
-- [ ] Unit tests (15): Fast (<0.1s), test individual functions
-- [ ] Integration tests (5): Medium (~1s), synthetic halos
-- [ ] Validation test (1): Slow (~5s), HAGN subset, marked `@pytest.mark.slow`
-- [ ] Manual validation: Full thesis reproduction in notebook (not in pytest)
-
-**Effort**: Included in Issue #1 | **Status**: Pending
-
----
-
-#### **Issue #10: Memory Management** [Priority: LOW]
-**Problem**: Loading 2GB maps + 197MB catalog causes OOM  
-**Solution**: Batch galaxy processing
-
-**Tasks**:
-- [ ] Implement `compute_ggl_batched()` - process catalog in 10k galaxy chunks
-- [ ] Keep map loaded, iterate over galaxy subsets
-- [ ] Test batch vs. full gives same result
-
-**Effort**: 0.5 hours | **Status**: Pending  
-**Note**: HEALPix not applicable (HAGN data is Cartesian patches)
-
----
-
-#### **Issue #11: Performance Documentation** [Priority: LOW]
-**Problem**: No timing documentation  
-**Solution**: Add timing to tutorial cells
-
-**Tasks**:
-- [ ] Add `%%time` to key notebook cells
-- [ ] Document expected timings: load (~5s), correlate (~10s), fit (<1s)
-- [ ] Add system specs in notebook
-
-**Effort**: Included in Issue #4 | **Status**: Pending
-
----
-
-#### **Issue #12: Scaling Test** [Priority: LOW]
-**Problem**: Tests use 100×100 grids, real data is 7200×7200  
-**Solution**: Add optional slow scaling test
-
-**Tasks**:
-- [ ] Create `test_ggl_scaling()` with 1000×1000 grid, 10k galaxies
-- [ ] Mark `@pytest.mark.slow` (skip by default)
-- [ ] Document: `pytest -m slow` runs scaling tests
-
-**Effort**: 1 hour | **Status**: Pending
-
----
-
-### Test Strategy
-
-**Acceptance Criteria**:
-1. ✅ All existing tests pass: 126/126 → **175/175**
-2. ✅ New tests breakdown:
-   - 15 unit (GGL)
-   - 5 integration (synthetic halos)
-   - 5 profile fitting
-   - 8 input validation
-   - 5 IO consolidation
-   - 10 SIS profile
-   - 1 scaling test
-   - **= 49 new tests**
-
-3. ✅ Notebook runs end-to-end without errors
-4. ✅ Generated plots match thesis qualitatively
-5. ✅ Synthetic halos: recover parameters within 5% (NFW) / 3% (SIS)
-6. ✅ Performance: 5-redshift analysis <10 minutes
-7. ✅ Memory: Peak <4GB
-
-**Regression Prevention**:
-- All 126 existing tests must pass
-- No breaking changes to existing API
-- Backward compatibility: `from cosmo_lensing.nfw import NFWProfile` aliased
-
----
-
-### Execution Order
-
-**Day 1: Foundations** (7h)
-1. Issue #2 (0.5h) - Fix colorbars
-2. Issue #6 (1h) - Consolidate loaders
-3. Issue #3 (4h) - Refactor profiles + SIS
-4. Issue #5 (2h) - NFW fitting
-5. Issue #7 (1h) - Validation
-6. Issue #8 (0.5h) - Convergence handling
-
-**Day 2: GGL Pipeline** (7h)
-7. Issue #1 (6h) - GGL module + tests
-8. Issue #10 (0.5h) - Batch processing
-9. Issue #12 (1h) - Scaling test
-
-**Day 3: Tutorial** (4h)
-10. Issue #4 (4h) - Jupyter notebook
-
-**Day 4: Validation** (2.5h)
-11. Manual thesis reproduction (2h)
-12. Generate comparison plots (0.5h)
-
-**Total**: 20.5 hours (3-4 days)
-
----
-
-### Deliverables
-
-**Code**:
-- `cosmo_lensing/profiles.py` (400 LOC)
-- `cosmo_lensing/ggl.py` (300 LOC)
-- Updated `cosmo_lensing/io.py` (+50 LOC)
-- Updated `cosmo_lensing/correlations.py` (+30 LOC)
-- Updated `scripts/validate_e2e_simple.py` (~10 lines)
-
-**Tests**:
-- `tests/test_profiles.py` (200 LOC, 15 tests)
-- `tests/test_ggl.py` (300 LOC, 21 tests)
-- Updated `tests/test_correlations.py` (+80 LOC, +8 tests)
-- Updated `tests/test_io.py` (+50 LOC, +5 tests)
-
-**Documentation**:
-- `docs/tutorial.ipynb` (30 cells)
-- Updated `README.md`
-- `PHASE7_COMPLETE.md`
-
-**Results**:
-- Fixed `results/e2e_validation/observables_maps.png`
-- New `results/ggl_validation/*.png`
-- New `results/thesis_reproduction/*.png`
-
----
-
-### Success Metrics
-
-Phase 7 complete when:
-- ✅ 175/175 tests passing
-- ✅ Tutorial runs end-to-end
-- ✅ Thesis figures qualitatively reproduced
-- ✅ Performance <10 min for 5 redshifts
-- ✅ Memory <4GB peak
-
-**Status**: 🚀 READY FOR AUTONOMOUS IMPLEMENTATION
-
----
+## Issues and Proposed Solutions
 
 ### Issue #1: Monolithic 1734-line toolkit with no module boundaries
 **Problem**: `raytrace_tk.jl` mixes I/O, derivatives, observables, statistics, plotting in 1734 lines  

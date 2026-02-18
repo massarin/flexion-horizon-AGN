@@ -229,3 +229,160 @@ def load_galaxy_catalog(filename: str) -> fits.fitsrec.FITS_rec:
 
     logger.info(f"Loaded catalog: {filename}, {len(catalog)} entries")
     return catalog
+
+
+def load_lensing_map(
+    filename: str,
+) -> Tuple[dict, dict]:
+    """
+    Load HAGN lensing map FITS file with all observables.
+
+    Reads a lensing map FITS file containing multiple HDUs for different
+    observables (gamma1, gamma2, rotation, magnification, etc.) and extracts
+    them into a dictionary.
+
+    Args:
+        filename: Path to FITS file containing lensing map
+
+    Returns:
+        Tuple of (data_dict, metadata_dict) where:
+        - data_dict: Dictionary mapping observable names to 2D arrays
+        - metadata_dict: Dictionary with 'redshift', 'pixscale', 'header'
+
+    Raises:
+        FileNotFoundError: If file does not exist
+        IOError: If FITS file cannot be read
+
+    Example:
+        >>> data, meta = load_lensing_map("lensing_maps/HAGN-lightcone_0250.fits")
+        >>> gamma1 = data['gamma1']
+        >>> z = meta['redshift']
+    """
+    filename = Path(filename)
+    if not filename.exists():
+        raise FileNotFoundError(f"Lensing map not found: {filename}")
+
+    logger.info(f"Loading lensing map: {filename}")
+
+    try:
+        with fits.open(filename) as hdul:
+            logger.debug(f"Found {len(hdul)} HDUs")
+
+            # Extract all observables
+            data = {}
+            for i, hdu in enumerate(hdul):
+                if i == 0:
+                    # Skip primary HDU
+                    continue
+
+                map_type = hdu.header.get("MAP", f"HDU{i}")
+                data[map_type] = hdu.data
+                logger.debug(f"HDU {i}: {map_type} - shape {hdu.data.shape}")
+
+            # Get metadata from first extension
+            if len(hdul) > 1:
+                header = hdul[1].header
+                redshift = header.get("REDSHIFT", None)
+                pixscale = header.get("CDELT1", None)
+            else:
+                raise IOError(f"No data extensions found in {filename}")
+
+        metadata = {"redshift": redshift, "pixscale": pixscale, "header": header}
+
+        logger.info(
+            f"Loaded {len(data)} observables at z={redshift}, " f"pixscale={abs(pixscale)*3600:.2f} arcsec"
+        )
+
+        return data, metadata
+
+    except Exception as e:
+        raise IOError(f"Failed to load lensing map {filename}: {e}")
+
+
+def load_galaxy_catalog(
+    filename: str, z_min: float = None, z_max: float = None, subsample: int = None
+) -> dict:
+    """
+    Load galaxy catalog FITS file with optional filtering.
+
+    Reads a galaxy catalog and optionally applies redshift cuts and subsampling.
+
+    Args:
+        filename: Path to FITS catalog file
+        z_min: Minimum redshift (inclusive), optional
+        z_max: Maximum redshift (inclusive), optional
+        subsample: If specified, randomly subsample to this many galaxies
+
+    Returns:
+        Dictionary with keys:
+        - 'ra': Right ascension (degrees)
+        - 'dec': Declination (degrees)
+        - 'z': Redshift
+        - Additional columns if present in catalog
+
+    Raises:
+        FileNotFoundError: If file does not exist
+        ValueError: If required columns are missing
+        IOError: If FITS file cannot be read
+
+    Example:
+        >>> cat = load_galaxy_catalog("galaxies.fits", z_min=0.5, z_max=2.0)
+        >>> ra, dec, z = cat['ra'], cat['dec'], cat['z']
+    """
+    filename = Path(filename)
+    if not filename.exists():
+        raise FileNotFoundError(f"Galaxy catalog not found: {filename}")
+
+    logger.info(f"Loading galaxy catalog: {filename}")
+
+    try:
+        with fits.open(filename) as hdul:
+            data = hdul[1].data
+
+            # Check for required columns
+            required = ["RA_IMG", "DEC_IMG", "z_true"]
+            for col in required:
+                if col not in data.names:
+                    raise ValueError(f"Required column '{col}' not found in catalog")
+
+            # Extract columns
+            catalog = {"ra": data["RA_IMG"], "dec": data["DEC_IMG"], "z": data["z_true"]}
+
+            # Add any additional columns that exist
+            optional_cols = ["MASS", "STELLAR_MASS", "HALO_MASS", "TYPE"]
+            for col in optional_cols:
+                if col in data.names:
+                    catalog[col.lower()] = data[col]
+
+        n_total = len(catalog["ra"])
+        logger.info(f"Loaded {n_total} galaxies")
+
+        # Apply redshift cuts
+        if z_min is not None or z_max is not None:
+            mask = np.ones(n_total, dtype=bool)
+            if z_min is not None:
+                mask = mask & (catalog["z"] >= z_min)
+            if z_max is not None:
+                mask = mask & (catalog["z"] <= z_max)
+
+            for key in catalog:
+                catalog[key] = catalog[key][mask]
+
+            logger.info(
+                f"After redshift cut [{z_min}, {z_max}]: " f"{len(catalog['ra'])} galaxies"
+            )
+
+        # Apply subsampling if requested
+        if subsample is not None and len(catalog["ra"]) > subsample:
+            indices = np.random.choice(len(catalog["ra"]), subsample, replace=False)
+            for key in catalog:
+                catalog[key] = catalog[key][indices]
+
+            logger.info(f"Subsampled to {subsample} galaxies")
+
+        return catalog
+
+    except ValueError:
+        raise
+    except Exception as e:
+        raise IOError(f"Failed to load galaxy catalog {filename}: {e}")

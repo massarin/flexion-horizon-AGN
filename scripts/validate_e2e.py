@@ -37,71 +37,10 @@ except ImportError as e:
     sys.exit(1)
 
 
-def load_lensing_map(filename):
-    """Load HAGN lensing map with all observables."""
-    logger.info(f"Loading lensing map: {filename}")
-    
-    with fits.open(filename) as hdul:
-        logger.info(f"  Found {len(hdul)} HDUs")
-        
-        # Extract all observables
-        data = {}
-        for i, hdu in enumerate(hdul):
-            map_type = hdu.header.get('MAP', f'HDU{i}')
-            if i > 0:  # Skip primary HDU
-                data[map_type] = hdu.data
-                logger.info(f"  HDU {i}: {map_type} - shape {hdu.data.shape}")
-        
-        # Get metadata from first extension
-        header = hdul[1].header
-        redshift = header.get('REDSHIFT', 'unknown')
-        pixscale = header.get('CDELT1', 'unknown')
-        
-    logger.info(f"  Redshift: {redshift}")
-    logger.info(f"  Pixel scale: {pixscale} deg")
-    
-    return data, {'redshift': redshift, 'pixscale': pixscale, 'header': header}
+# Use consolidated loaders from io module
+load_lensing_map = io.load_lensing_map
+load_galaxy_catalog = io.load_galaxy_catalog
 
-
-def load_galaxy_catalog(filename, z_min=None, z_max=None, subsample=None):
-    """Load galaxy catalog and apply selection."""
-    logger.info(f"Loading galaxy catalog: {filename}")
-    
-    # Load FITS catalog directly
-    with fits.open(filename) as hdul:
-        data = hdul[1].data
-        
-        # Extract columns into dictionary
-        cat = {
-            'ra': data['RA_IMG'],
-            'dec': data['DEC_IMG'],
-            'z': data['z_true']
-        }
-    
-    n_total = len(cat['ra'])
-    logger.info(f"  Total galaxies: {n_total}")
-    
-    # Apply redshift cuts if specified
-    if z_min is not None or z_max is not None:
-        mask = np.ones(n_total, dtype=bool)
-        if z_min is not None:
-            mask = mask & (cat['z'] >= z_min)
-        if z_max is not None:
-            mask = mask & (cat['z'] <= z_max)
-        
-        for key in cat:
-            cat[key] = cat[key][mask]
-        
-        logger.info(f"  After redshift cut [{z_min}, {z_max}]: {len(cat['ra'])} galaxies")
-    
-    # Subsample if requested (for faster testing)
-    if subsample is not None and subsample < len(cat['ra']):
-        logger.info(f"  Subsampling to {subsample} galaxies")
-        idx = np.random.choice(len(cat['ra']), subsample, replace=False)
-        for key in cat:
-            cat[key] = cat[key][idx]
-    
-    return cat
 
 
 def compute_tangential_shear(lensing_data, galaxy_cat, metadata, nbins=15):
