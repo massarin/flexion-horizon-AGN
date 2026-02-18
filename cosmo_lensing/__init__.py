@@ -14,6 +14,7 @@ Modules:
     derivatives: Finite-difference derivatives for Jacobian computation
     observables: Lensing observables (κ, γ, F, G)
     correlations: Tangential correlation functions
+    ggl: Galaxy-galaxy lensing high-level interface
     profiles: NFW and SIS profile models (replaces nfw)
     nfw: Deprecated, use profiles instead
     healpix_utils: HEALPix sky map utilities
@@ -29,6 +30,7 @@ from . import (
     derivatives,
     observables,
     correlations,
+    ggl,
     profiles,
     nfw,  # Deprecated
     healpix_utils,
@@ -41,6 +43,7 @@ __all__ = [
     "derivatives",
     "observables",
     "correlations",
+    "ggl",
     "profiles",
     "nfw",
     "healpix_utils",
