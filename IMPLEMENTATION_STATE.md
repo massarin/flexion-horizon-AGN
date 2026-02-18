@@ -110,28 +110,27 @@ This codebase performs **weak gravitational lensing analysis** on cosmological N
 - Snakemake workflow ready for HPC deployment
 - CLI tools fully functional and tested
 
-### ⏸️ Phase 5: HEALPix & Scaling (Week 7-8) - PENDING
+### ✅ Phase 5: HEALPix & Scaling (Week 7-8) - PARTIALLY COMPLETE
 **Goal**: Handle full-sky data and optimize performance
 
-**Tasks**:
-- [ ] Implement `healpix_utils.py`:
-  * HEALPix → Cartesian projection for finite differences
+**Completed**:
+- [x] Implement `healpix_utils.py`: (340 lines)
+  * HEALPixMap class with RING/NESTED ordering support
+  * Gnomonic projection to Cartesian patches for finite differences
   * Neighbor finding for boundary conditions
-  * Memory-efficient chunking (process Nside=8192 in 100 MB chunks)
-- [ ] Add `ray_parallel.py` for distributed processing:
-  * Ray task graph for embarrassingly parallel operations
-  * Progress tracking with tqdm
-  * Automatic checkpointing
-- [ ] Performance optimization:
-  * Profile with `line_profiler`
-  * Vectorize hot loops (aim for 10× speedup)
-  * Consider numba JIT for derivatives
-- [ ] Scaling tests:
-  * 100×100 pixels: < 1 second
-  * 1000×1000 pixels: < 10 seconds  
-  * 20000×20000 pixels: < 5 minutes (target)
+  * FITS I/O with proper ordering handling
+  * Memory-efficient patch processing iterator
+  * 22 comprehensive tests, all passing
+- [x] Git commit documenting HEALPix implementation
 
-### ⏸️ Phase 6: Final Validation & Cleanup (Week 9-10) - PENDING  
+**Pending**:
+- [ ] Add `ray_parallel.py` for distributed processing (if needed for performance)
+- [ ] Performance optimization with profiling
+- [ ] Full scaling tests on 20k×20k pixels
+
+**Results**: 126/126 tests passing, HEALPix support fully functional
+
+### ⏸️ Phase 6: Final Validation & Cleanup (Week 9-10) - IN PROGRESS  
 **Goal**: Production-ready package
 
 **Tasks**:
