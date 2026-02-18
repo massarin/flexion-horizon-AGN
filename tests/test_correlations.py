@@ -263,3 +263,123 @@ class TestFlexionCorrelation:
         
         # Should have same radial bins
         assert len(F_result['r']) == len(G_result['r'])
+
+
+class TestInputValidation:
+    """Test input validation in TangentialCorrelation."""
+
+    def test_mismatched_lens_arrays(self):
+        """Test that mismatched lens array lengths raise ValueError."""
+        corr = TangentialCorrelation(rmin=1.0, rmax=10.0, nbins=5)
+
+        ra_lens = np.array([0.0, 1.0])
+        dec_lens = np.array([0.0])  # Mismatched
+        ra_src = np.array([0.1, 0.2])
+        dec_src = np.array([0.1, 0.2])
+        g1 = np.array([0.01, 0.02])
+        g2 = np.array([0.01, 0.02])
+
+        with pytest.raises(ValueError, match="Lens arrays mismatched"):
+            corr.compute(ra_lens, dec_lens, ra_src, dec_src, g1, g2)
+
+    def test_mismatched_source_arrays(self):
+        """Test that mismatched source array lengths raise ValueError."""
+        corr = TangentialCorrelation(rmin=1.0, rmax=10.0, nbins=5)
+
+        ra_lens = np.array([0.0])
+        dec_lens = np.array([0.0])
+        ra_src = np.array([0.1, 0.2])
+        dec_src = np.array([0.1, 0.2])
+        g1 = np.array([0.01])  # Mismatched
+        g2 = np.array([0.01, 0.02])
+
+        with pytest.raises(ValueError, match="Source arrays must have same length"):
+            corr.compute(ra_lens, dec_lens, ra_src, dec_src, g1, g2)
+
+    def test_empty_lens_catalog(self):
+        """Test that empty lens catalog raises ValueError."""
+        corr = TangentialCorrelation(rmin=1.0, rmax=10.0, nbins=5)
+
+        ra_lens = np.array([])
+        dec_lens = np.array([])
+        ra_src = np.array([0.1])
+        dec_src = np.array([0.1])
+        g1 = np.array([0.01])
+        g2 = np.array([0.01])
+
+        with pytest.raises(ValueError, match="Empty lens catalog"):
+            corr.compute(ra_lens, dec_lens, ra_src, dec_src, g1, g2)
+
+    def test_empty_source_catalog(self):
+        """Test that empty source catalog raises ValueError."""
+        corr = TangentialCorrelation(rmin=1.0, rmax=10.0, nbins=5)
+
+        ra_lens = np.array([0.0])
+        dec_lens = np.array([0.0])
+        ra_src = np.array([])
+        dec_src = np.array([])
+        g1 = np.array([])
+        g2 = np.array([])
+
+        with pytest.raises(ValueError, match="Empty source catalog"):
+            corr.compute(ra_lens, dec_lens, ra_src, dec_src, g1, g2)
+
+    def test_nan_in_coordinates(self):
+        """Test that NaN in coordinates raises ValueError."""
+        corr = TangentialCorrelation(rmin=1.0, rmax=10.0, nbins=5)
+
+        ra_lens = np.array([0.0, np.nan])
+        dec_lens = np.array([0.0, 0.0])
+        ra_src = np.array([0.1, 0.2])
+        dec_src = np.array([0.1, 0.2])
+        g1 = np.array([0.01, 0.02])
+        g2 = np.array([0.01, 0.02])
+
+        with pytest.raises(ValueError, match="ra_lens contains.*NaN or Inf"):
+            corr.compute(ra_lens, dec_lens, ra_src, dec_src, g1, g2)
+
+    def test_inf_in_shear(self):
+        """Test that Inf in shear raises ValueError."""
+        corr = TangentialCorrelation(rmin=1.0, rmax=10.0, nbins=5)
+
+        ra_lens = np.array([0.0])
+        dec_lens = np.array([0.0])
+        ra_src = np.array([0.1, 0.2])
+        dec_src = np.array([0.1, 0.2])
+        g1 = np.array([0.01, np.inf])
+        g2 = np.array([0.01, 0.02])
+
+        with pytest.raises(ValueError, match="g1 contains.*NaN or Inf"):
+            corr.compute(ra_lens, dec_lens, ra_src, dec_src, g1, g2)
+
+    def test_dec_out_of_bounds(self):
+        """Test that dec out of [-90, 90] raises ValueError."""
+        corr = TangentialCorrelation(rmin=1.0, rmax=10.0, nbins=5)
+
+        ra_lens = np.array([0.0])
+        dec_lens = np.array([100.0])  # Out of bounds
+        ra_src = np.array([0.1])
+        dec_src = np.array([0.1])
+        g1 = np.array([0.01])
+        g2 = np.array([0.01])
+
+        with pytest.raises(ValueError, match="dec_lens has.*out of range"):
+            corr.compute(ra_lens, dec_lens, ra_src, dec_src, g1, g2)
+
+    def test_valid_input_passes(self):
+        """Test that valid input runs successfully."""
+        corr = TangentialCorrelation(
+            rmin=1.0, rmax=10.0, nbins=5, var_method="sample"
+        )
+
+        ra_lens = np.array([0.0])
+        dec_lens = np.array([0.0])
+        ra_src = np.linspace(0, 5, 100) / 60.0
+        dec_src = np.linspace(0, 5, 100) / 60.0
+        g1 = np.random.randn(100) * 0.01
+        g2 = np.random.randn(100) * 0.01
+
+        # Should not raise
+        result = corr.compute(ra_lens, dec_lens, ra_src, dec_src, g1, g2)
+        assert "r" in result
+        assert "xi" in result

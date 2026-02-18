@@ -72,6 +72,96 @@ class TangentialCorrelation:
             f"var_method={var_method}"
         )
 
+    def _validate_inputs(
+        self,
+        ra_lens: np.ndarray,
+        dec_lens: np.ndarray,
+        ra_src: np.ndarray,
+        dec_src: np.ndarray,
+        g1: np.ndarray,
+        g2: np.ndarray,
+        weights: Optional[np.ndarray],
+    ) -> None:
+        """
+        Validate correlation inputs.
+
+        Args:
+            ra_lens, dec_lens: Lens coordinates
+            ra_src, dec_src: Source coordinates
+            g1, g2: Shear components
+            weights: Optional source weights
+
+        Raises:
+            ValueError: If inputs are invalid
+        """
+        # Check lens array lengths match
+        if len(ra_lens) != len(dec_lens):
+            raise ValueError(
+                f"Lens arrays mismatched: ra_lens has {len(ra_lens)} elements, "
+                f"dec_lens has {len(dec_lens)} elements"
+            )
+
+        # Check source array lengths match
+        if not (len(ra_src) == len(dec_src) == len(g1) == len(g2)):
+            raise ValueError(
+                f"Source arrays must have same length: "
+                f"ra_src={len(ra_src)}, dec_src={len(dec_src)}, "
+                f"g1={len(g1)}, g2={len(g2)}"
+            )
+
+        # Check weights if provided
+        if weights is not None and len(weights) != len(ra_src):
+            raise ValueError(
+                f"Weights length ({len(weights)}) must match source arrays ({len(ra_src)})"
+            )
+
+        # Check for empty arrays
+        if len(ra_lens) == 0:
+            raise ValueError("Empty lens catalog")
+        if len(ra_src) == 0:
+            raise ValueError("Empty source catalog")
+
+        # Check for NaN/Inf in lens coordinates
+        for name, arr in [("ra_lens", ra_lens), ("dec_lens", dec_lens)]:
+            if not np.all(np.isfinite(arr)):
+                n_bad = np.sum(~np.isfinite(arr))
+                raise ValueError(f"{name} contains {n_bad} NaN or Inf values")
+
+        # Check for NaN/Inf in source data
+        for name, arr in [
+            ("ra_src", ra_src),
+            ("dec_src", dec_src),
+            ("g1", g1),
+            ("g2", g2),
+        ]:
+            if not np.all(np.isfinite(arr)):
+                n_bad = np.sum(~np.isfinite(arr))
+                raise ValueError(f"{name} contains {n_bad} NaN or Inf values")
+
+        # Check weights
+        if weights is not None and not np.all(np.isfinite(weights)):
+            n_bad = np.sum(~np.isfinite(weights))
+            raise ValueError(f"weights contains {n_bad} NaN or Inf values")
+
+        # Check coordinate ranges
+        if not np.all((dec_lens >= -90) & (dec_lens <= 90)):
+            n_bad = np.sum((dec_lens < -90) | (dec_lens > 90))
+            raise ValueError(f"dec_lens has {n_bad} values out of range [-90, 90]")
+
+        if not np.all((dec_src >= -90) & (dec_src <= 90)):
+            n_bad = np.sum((dec_src < -90) | (dec_src > 90))
+            raise ValueError(f"dec_src has {n_bad} values out of range [-90, 90]")
+
+        # Sanity check: very large shear (warn but don't fail)
+        shear_mag = np.sqrt(g1**2 + g2**2)
+        if np.any(shear_mag > 10):
+            max_shear = np.max(shear_mag)
+            n_large = np.sum(shear_mag > 10)
+            logger.warning(
+                f"Very large shear detected: {n_large} sources with |γ| > 10 "
+                f"(max |γ| = {max_shear:.2f})"
+            )
+
     def compute(
         self,
         ra_lens: np.ndarray,
@@ -104,7 +194,13 @@ class TangentialCorrelation:
             - 'xim_err': Error on cross component
             - 'npairs': Number of pairs per bin
             - 'weight': Sum of weights per bin
+
+        Raises:
+            ValueError: If inputs are invalid (empty, mismatched, NaN, out of bounds)
         """
+        # Input validation
+        self._validate_inputs(ra_lens, dec_lens, ra_src, dec_src, g1, g2, weights)
+
         logger.info(f"Computing correlation for {len(ra_lens)} lenses, " f"{len(ra_src)} sources")
 
         # Adjust npatch for small samples (must be same for both catalogs)
@@ -194,8 +290,34 @@ class TangentialCorrelation:
             weights: Optional weights for sources
 
         Returns:
-            (F_result, G_result): Tuple of dictionaries with correlation results
+            Tuple of (F_result, G_result) dictionaries with correlation results
+
+        Raises:
+            ValueError: If inputs are invalid
         """
+        # Validate inputs (reuse shear validation, check F and G)
+        # Check lengths
+        if len(ra_lens) != len(dec_lens):
+            raise ValueError("Lens arrays mismatched")
+        if not (len(ra_src) == len(dec_src) == len(F1) == len(F2) == len(G1) == len(G2)):
+            raise ValueError("Source arrays must have same length")
+        if len(ra_lens) == 0 or len(ra_src) == 0:
+            raise ValueError("Empty catalog")
+
+        # Check for NaN/Inf
+        for name, arr in [
+            ("ra_lens", ra_lens),
+            ("dec_lens", dec_lens),
+            ("ra_src", ra_src),
+            ("dec_src", dec_src),
+            ("F1", F1),
+            ("F2", F2),
+            ("G1", G1),
+            ("G2", G2),
+        ]:
+            if not np.all(np.isfinite(arr)):
+                raise ValueError(f"{name} contains NaN or Inf values")
+
         logger.info("Computing flexion correlations")
 
         # F correlation (treat like shear)
@@ -205,3 +327,4 @@ class TangentialCorrelation:
         G_result = self.compute(ra_lens, dec_lens, ra_src, dec_src, G1, G2, weights)
 
         return F_result, G_result
+
