@@ -378,3 +378,79 @@ class TestGGLIntegration:
         # With noisy small sample, parameters should be order-of-magnitude correct
         assert 0.01 < fit["ks"] < 1.0
         assert 1 < fit["rs"] < 50
+
+
+class TestGGLScaling:
+    """Scaling tests for GGL pipeline (marked slow)."""
+    
+    @pytest.mark.slow
+    def test_large_catalog_performance(self):
+        """Test performance with realistic catalog sizes."""
+        import time
+        
+        # Realistic sizes
+        n_lens = 5000
+        n_src = 50000
+        
+        # Generate data
+        ra_lens = np.random.uniform(0, 10, n_lens)
+        dec_lens = np.random.uniform(-5, 5, n_lens)
+        ra_src = np.random.uniform(0, 10, n_src)
+        dec_src = np.random.uniform(-5, 5, n_src)
+        
+        gamma1 = np.random.randn(n_src) * 0.01
+        gamma2 = np.random.randn(n_src) * 0.01
+        
+        # Time correlation
+        start = time.time()
+        result = ggl.compute_ggl_correlation(
+            ra_lens, dec_lens, ra_src, dec_src,
+            gamma1, gamma2,
+            min_sep=1, max_sep=100, nbins=10, sep_units="arcmin"
+        )
+        elapsed = time.time() - start
+        
+        print(f"\n  Performance test:")
+        print(f"    {n_lens} lenses, {n_src} sources")
+        print(f"    Correlation time: {elapsed:.2f} seconds")
+        print(f"    Pairs computed: {result['npairs'].sum():.0f}")
+        
+        # Should complete in reasonable time
+        assert elapsed < 60, f"Too slow: {elapsed:.1f}s > 60s"
+        
+        # Should have reasonable number of pairs
+        assert result['npairs'].sum() > 1000, "Too few pairs"
+    
+    @pytest.mark.slow
+    def test_memory_efficiency(self):
+        """Test memory usage doesn't grow with catalog size."""
+        import psutil
+        import os
+        
+        process = psutil.Process(os.getpid())
+        mem_before = process.memory_info().rss / 1024**2  # MB
+        
+        # Process large catalog
+        n_src = 100000
+        ra_lens = np.random.uniform(0, 10, 1000)
+        dec_lens = np.random.uniform(-5, 5, 1000)
+        ra_src = np.random.uniform(0, 10, n_src)
+        dec_src = np.random.uniform(-5, 5, n_src)
+        gamma1 = np.random.randn(n_src) * 0.01
+        gamma2 = np.random.randn(n_src) * 0.01
+        
+        result = ggl.compute_ggl_correlation(
+            ra_lens, dec_lens, ra_src, dec_src,
+            gamma1, gamma2, nbins=10
+        )
+        
+        mem_after = process.memory_info().rss / 1024**2  # MB
+        mem_increase = mem_after - mem_before
+        
+        print(f"\n  Memory test:")
+        print(f"    Before: {mem_before:.1f} MB")
+        print(f"    After: {mem_after:.1f} MB")
+        print(f"    Increase: {mem_increase:.1f} MB")
+        
+        # Memory increase should be reasonable (<500 MB for 100k sources)
+        assert mem_increase < 500, f"Memory leak? {mem_increase:.1f}MB increase"
