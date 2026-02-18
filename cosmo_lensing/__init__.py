@@ -5,7 +5,7 @@ This package provides tools for:
 - Reading deflection fields from Fortran binary files
 - Computing lensing observables (convergence, shear, flexion)
 - Measuring tangential correlations (galaxy-galaxy lensing)
-- Fitting NFW halo profiles
+- Fitting NFW and SIS halo profiles
 - Generating publication-quality plots
 
 Modules:
@@ -14,13 +14,26 @@ Modules:
     derivatives: Finite-difference derivatives for Jacobian computation
     observables: Lensing observables (κ, γ, F, G)
     correlations: Tangential correlation functions
-    nfw: NFW profile modeling
+    profiles: NFW and SIS profile models (replaces nfw)
+    nfw: Deprecated, use profiles instead
+    healpix_utils: HEALPix sky map utilities
+    synthetic_data: Test field generation
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __author__ = "Laurent Magri-Stella"
 
-from . import io, cosmology, derivatives, observables, correlations, nfw
+from . import (
+    io,
+    cosmology,
+    derivatives,
+    observables,
+    correlations,
+    profiles,
+    nfw,  # Deprecated
+    healpix_utils,
+    synthetic_data,
+)
 
 __all__ = [
     "io",
@@ -28,5 +41,8 @@ __all__ = [
     "derivatives",
     "observables",
     "correlations",
+    "profiles",
     "nfw",
+    "healpix_utils",
+    "synthetic_data",
 ]

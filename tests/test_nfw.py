@@ -257,7 +257,7 @@ class TestNFWPlaceholders:
     
     def test_from_mass_concentration_not_implemented(self):
         """Test that from_mass_concentration raises NotImplementedError."""
-        with pytest.raises(NotImplementedError, match="Phase 4"):
+        with pytest.raises(NotImplementedError, match="cosmology"):
             NFWProfile.from_mass_concentration(
                 mass=1e14, concentration=5.0,
                 redshift_lens=0.3, redshift_source=0.8
