@@ -424,7 +424,11 @@ class TestGGLScaling:
     @pytest.mark.slow
     def test_memory_efficiency(self):
         """Test memory usage doesn't grow with catalog size."""
-        import psutil
+        try:
+            import psutil
+        except ImportError:
+            pytest.skip("psutil not installed")
+        
         import os
         
         process = psutil.Process(os.getpid())
