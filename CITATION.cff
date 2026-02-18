@@ -1,0 +1,64 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "Cosmo Lensing: Weak Gravitational Lensing Analysis Pipeline"
+version: 1.0.0
+date-released: 2026-02-18
+abstract: "Production-ready Python package for weak gravitational lensing analysis of cosmological N-body simulations. Provides tools for computing lensing observables (convergence, shear, flexion), measuring tangential correlations, and fitting NFW halo profiles. Includes HEALPix support for full-sky data and comprehensive test suite."
+authors:
+  - family-names: "Magri-Stella"
+    given-names: "Laurent"
+    email: "laurent.magristella@example.com"
+    affiliation: "Your Institution"
+repository-code: "https://github.com/yourusername/cosmo_lensing"
+url: "https://github.com/yourusername/cosmo_lensing"
+keywords:
+  - weak gravitational lensing
+  - cosmology
+  - N-body simulations
+  - galaxy-galaxy lensing
+  - NFW profiles
+  - HEALPix
+  - Python
+license: MIT
+identifiers:
+  - description: "This is the software version"
+    type: software-version
+    value: "1.0.0"
+references:
+  - type: article
+    authors:
+      - family-names: "Bartelmann"
+        given-names: "Matthias"
+      - family-names: "Schneider"
+        given-names: "Peter"
+    title: "Weak gravitational lensing"
+    journal: "Physics Reports"
+    volume: 340
+    issue: 4-5
+    year: 2001
+    pages: 291-472
+    doi: "10.1016/S0370-1573(00)00082-X"
+  - type: article
+    authors:
+      - family-names: "Bacon"
+        given-names: "D. J."
+    title: "Measuring gravitational spin"
+    journal: "Monthly Notices of the Royal Astronomical Society"
+    volume: 365
+    issue: 2
+    year: 2006
+    pages: 414-428
+    doi: "10.1111/j.1365-2966.2005.09624.x"
+  - type: article
+    authors:
+      - family-names: "Wright"
+        given-names: "Clifford O."
+      - family-names: "Brainerd"
+        given-names: "Tereasa G."
+    title: "Gravitational Lensing by NFW Halos"
+    journal: "The Astrophysical Journal"
+    volume: 534
+    year: 2000
+    pages: 34-40
+    doi: "10.1086/308744"
