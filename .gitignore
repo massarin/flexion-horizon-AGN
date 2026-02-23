@@ -2,3 +2,5 @@
 *.jld2
 *.png
 *.csv
+.venv
+__pycache__/
